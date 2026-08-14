@@ -123,6 +123,7 @@ class ReadingStats {
   final int totalMinutesToday;
   final int currentStreak;
   final ReadingEmotion? emotion;
+  final int pointsEarned;
 
   const ReadingStats({
     required this.bookTitle,
@@ -132,6 +133,7 @@ class ReadingStats {
     required this.totalMinutesToday,
     required this.currentStreak,
     this.emotion,
+    this.pointsEarned = 0,
   });
 
   /// Páginas por minuto nesta sessão específica.

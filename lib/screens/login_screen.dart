@@ -253,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       OutlinedButton.icon(
                         // Bloqueado por enquanto — falta configuração
                         // nativa do Google Sign-In (ver pubspec_dependencies.md).
-                        onPressed: null,
+                        onPressed: _handleGoogleLogin,
                         icon: const Icon(Icons.lock_outline, size: 20),
                         label: const Text('Continuar com Google (em breve)'),
                       ),

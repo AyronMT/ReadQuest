@@ -131,6 +131,38 @@ class BookRepository {
     );
   }
 
+  /// Atualiza todos os dados de um livro existente.
+  Future<void> updateBook(Book book) async {
+    final db = await _dbHelper.database;
+    if (book.id == null) return;
+
+    await db.update(
+      'books',
+      book.toMap()..remove('id'),
+      where: 'id = ?',
+      whereArgs: [book.id],
+    );
+  }
+
+  /// Deleta um livro e todos os seus registros de leitura.
+  Future<void> deleteBook(int bookId) async {
+    final db = await _dbHelper.database;
+    
+    // Deleta registros de leitura do livro
+    await db.delete(
+      'reading_sessions',
+      where: 'book_id = ?',
+      whereArgs: [bookId],
+    );
+    
+    // Deleta o livro
+    await db.delete(
+      'books',
+      where: 'id = ?',
+      whereArgs: [bookId],
+    );
+  }
+
   /// Retorna os gêneros distintos já cadastrados (para os filtros da
   /// Biblioteca e para sugestões de autopreenchimento).
   Future<List<String>> getDistinctGenres() => _getDistinctValues('genre');

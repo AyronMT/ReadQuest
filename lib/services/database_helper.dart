@@ -72,6 +72,46 @@ class DatabaseHelper {
           )
         ''');
 
+        await db.execute('''
+          CREATE TABLE point_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            amount INTEGER NOT NULL,
+            reason TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE streak_freezes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            status TEXT NOT NULL DEFAULT 'available',
+            protected_date TEXT,
+            created_at TEXT NOT NULL,
+            used_at TEXT
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE custom_rewards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            cost INTEGER NOT NULL,
+            emoji TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE reward_redemptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reward_id TEXT NOT NULL,
+            reward_title TEXT NOT NULL,
+            cost INTEGER NOT NULL,
+            is_consumable INTEGER NOT NULL,
+            redeemed_at TEXT NOT NULL
+          )
+        ''');
+
         // Aqui futuramente entram outras tabelas do app: metas, loja, etc.
       },
     );

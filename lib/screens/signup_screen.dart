@@ -229,7 +229,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   // Botão de cadastro com Google — bloqueado por enquanto,
                   // falta configuração nativa (ver pubspec_dependencies.md).
                   OutlinedButton.icon(
-                    onPressed: null,
+                    onPressed: _handleGoogleSignUp,
                     icon: const Icon(Icons.lock_outline, size: 20),
                     label: const Text('Continuar com Google (em breve)'),
                   ),

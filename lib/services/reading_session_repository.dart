@@ -2,6 +2,8 @@ import '../models/book.dart';
 import '../models/reading_session.dart';
 import 'book_repository.dart';
 import 'database_helper.dart';
+import 'gamification_service.dart';
+import 'streak_freeze_repository.dart';
 
 class ReadingSessionRepository {
   ReadingSessionRepository._internal();
@@ -10,6 +12,7 @@ class ReadingSessionRepository {
 
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final BookRepository _bookRepository = BookRepository.instance;
+  final GamificationService _gamification = GamificationService.instance;
 
   String _dateKey(DateTime d) {
     return '${d.year.toString().padLeft(4, '0')}-'
@@ -18,7 +21,8 @@ class ReadingSessionRepository {
   }
 
   /// Registra uma nova sessão de leitura, atualiza o progresso do
-  /// livro e retorna as estatísticas para exibir no pop-up de resumo.
+  /// livro, concede os pontos correspondentes e retorna as
+  /// estatísticas para exibir no pop-up de resumo.
   /// [emotion] e [feedback] são opcionais.
   Future<ReadingStats> addSession({
     required Book book,
@@ -30,6 +34,10 @@ class ReadingSessionRepository {
   }) async {
     final db = await _dbHelper.database;
     final now = DateTime.now();
+
+    final wasFinishedBefore = book.status == BookStatus.finished;
+    final todayBefore = await getTodayTotals();
+    final isFirstSessionToday = todayBefore.pages == 0 && todayBefore.minutes == 0;
 
     final session = ReadingSession(
       bookId: book.id!,
@@ -47,6 +55,26 @@ class ReadingSessionRepository {
       book.currentPage + pagesRead,
     );
 
+    final updatedBook = await _bookRepository.getById(book.id!);
+    final justFinished = !wasFinishedBefore && updatedBook?.status == BookStatus.finished;
+
+    var pointsEarned = await _gamification.awardPoints(
+      GamificationRules.readingLogged,
+      'reading_logged',
+    );
+    if (isFirstSessionToday) {
+      pointsEarned += await _gamification.awardPoints(
+        GamificationRules.dailyStreakBonus,
+        'streak_bonus',
+      );
+    }
+    if (justFinished) {
+      pointsEarned += await _gamification.awardPoints(
+        GamificationRules.bookFinishedBonus,
+        'book_finished',
+      );
+    }
+
     final todayTotals = await getTodayTotals();
     final streak = await getCurrentStreak();
 
@@ -58,6 +86,7 @@ class ReadingSessionRepository {
       totalMinutesToday: todayTotals.minutes,
       currentStreak: streak,
       emotion: emotion,
+      pointsEarned: pointsEarned,
     );
   }
 
@@ -93,7 +122,9 @@ class ReadingSessionRepository {
   }
 
   /// Calcula quantos dias seguidos (incluindo hoje, se já houver
-  /// registro) o usuário leu algo — o "sistema de ofensiva".
+  /// registro) o usuário leu algo — o "sistema de ofensiva". Uma
+  /// lacuna de exatamente um dia pode ser coberta automaticamente
+  /// por um congelamento de ofensiva disponível (ver StreakFreezeRepository).
   Future<int> getCurrentStreak() async {
     final db = await _dbHelper.database;
 
@@ -104,27 +135,37 @@ class ReadingSessionRepository {
 
     if (rows.isEmpty) return 0;
 
-    final dates = rows
+    final sessionDates = rows
         .map((r) => DateTime.parse(r['session_date'] as String))
-        .toList();
+        .toSet();
 
     var cursor = DateTime.now();
     cursor = DateTime(cursor.year, cursor.month, cursor.day);
 
     // Se ainda não leu nada hoje, a sequência continua valendo a
-    // partir de ontem — só quebra se faltar um dia inteiro.
-    if (dates.first != cursor) {
+    // partir de ontem — só quebra se faltar um dia inteiro (e não
+    // houver congelamento disponível para cobri-lo).
+    if (!sessionDates.contains(cursor)) {
       cursor = cursor.subtract(const Duration(days: 1));
     }
 
     var streak = 0;
-    for (final date in dates) {
-      if (date == cursor) {
+    while (true) {
+      if (sessionDates.contains(cursor)) {
         streak++;
         cursor = cursor.subtract(const Duration(days: 1));
-      } else if (date.isBefore(cursor)) {
-        break;
+        continue;
       }
+
+      final covered = await StreakFreezeRepository.instance.coverGapDate(cursor);
+      if (covered) {
+        // O dia foi protegido por um congelamento: a sequência não
+        // quebra, mas esse dia em si não conta como leitura.
+        cursor = cursor.subtract(const Duration(days: 1));
+        continue;
+      }
+
+      break;
     }
 
     return streak;

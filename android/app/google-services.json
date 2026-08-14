@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1024459433574",
+    "project_id": "monitoradordeleitura",
+    "storage_bucket": "monitoradordeleitura.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1024459433574:android:2d9d8117e11fca2830afa7",
+        "android_client_info": {
+          "package_name": "com.example.monitorador_de_leitura"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-cPIgYalw6ENcrPiQWctx1RNLACCI5_c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,6 +3,8 @@ import '../models/book.dart';
 import '../models/reading_session.dart';
 import '../services/book_repository.dart';
 import '../services/reading_session_repository.dart';
+import '../services/gamification_service.dart';
+import '../services/reward_repository.dart';
 import '../services/tutorial_controller.dart';
 import '../services/tutorial_repository.dart';
 import '../widgets/tutorial_highlight.dart';
@@ -33,6 +35,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Book> _currentBooks = [];
   int _streak = 0;
   ({int pages, int minutes}) _todayTotals = (pages: 0, minutes: 0);
+  int _points = 0;
+  Set<String> _ownedDecorations = {};
   bool _isLoading = true;
 
   @override
@@ -45,15 +49,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadData() async {
+    await GamificationService.instance.awardDailyOpenBonusIfNeeded();
+
     final books = await _bookRepository.getUnfinishedBooks(limit: 3);
     final streak = await _sessionRepository.getCurrentStreak();
     final todayTotals = await _sessionRepository.getTodayTotals();
+    final points = await GamificationService.instance.getBalance();
+    final owned = await RewardRepository.instance.getOwnedNonConsumableIds();
 
     if (!mounted) return;
     setState(() {
       _currentBooks = books;
       _streak = streak;
       _todayTotals = todayTotals;
+      _points = points;
+      _ownedDecorations = owned;
       _isLoading = false;
     });
   }
@@ -209,14 +219,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
-        TutorialHighlight(
-          stepId: 'profile_button',
-          child: IconButton.filledTonal(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.tertiaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Text('🪙', style: TextStyle(fontSize: 16)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '$_points',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onTertiaryContainer,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            icon: const Icon(Icons.person_outline),
-          ),
+            const SizedBox(width: 10),
+            TutorialHighlight(
+              stepId: 'profile_button',
+              child: IconButton.filledTonal(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                ),
+                icon: const Icon(Icons.person_outline),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -272,6 +307,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildStreakSection(BuildContext context) {
     final theme = Theme.of(context);
+    final hasGoldAccent = _ownedDecorations.contains('accent_gold');
+    final hasStarsDecoration = _ownedDecorations.contains('deco_stars');
+    final flameColor = hasGoldAccent ? Colors.amber.shade700 : Colors.deepOrange;
 
     return TutorialHighlight(
       stepId: 'streak',
@@ -283,9 +321,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.local_fire_department_rounded,
-              color: Colors.deepOrange,
+              color: flameColor,
               size: 32,
             ),
             const SizedBox(width: 14),
@@ -293,11 +331,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '$_streak ${_streak == 1 ? "dia" : "dias"} seguidos',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        '$_streak ${_streak == 1 ? "dia" : "dias"} seguidos',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (hasStarsDecoration) ...[
+                        const SizedBox(width: 6),
+                        const Text('🌟', style: TextStyle(fontSize: 16)),
+                      ],
+                    ],
                   ),
                   Text(
                     'Sua ofensiva de leitura',

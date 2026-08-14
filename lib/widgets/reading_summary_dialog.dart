@@ -24,6 +24,22 @@ Future<void> showReadingSummaryDialog(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (stats.pointsEarned > 0)
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '+${stats.pointsEarned} pontos 🪙',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onTertiaryContainer,
+                  ),
+                ),
+              ),
             _StatRow(label: 'Livro', value: stats.bookTitle),
             _StatRow(
               label: 'Nesta sessão',
