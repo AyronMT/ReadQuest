@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Placeholder do Perfil — será desenvolvido nas próximas etapas.
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -9,7 +8,15 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Perfil')),
       body: const Center(
-        child: Text('Seus dados e preferências — em construção 👤'),
+        children: [
+          Text('Seus dados e preferências — em construção 👤'),
+          IconButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              ),
+              icon: const Icon(Icons.bar_reply) ),
+        ]
+
       ),
     );
   }

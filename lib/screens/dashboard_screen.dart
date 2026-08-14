@@ -379,7 +379,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: hasReadToday
                   ? Text(
-                      'Hoje você já leu ${_todayTotals.pages} páginas em ${_todayTotals.minutes} min.',
+                      'Hoje você já leu ${_todayTotals.pages} páginas em ${{_todayTotals.minutes}/60} horas.',
                       style: theme.textTheme.bodyMedium,
                     )
                   : Text(
@@ -487,7 +487,7 @@ class _BookProgressCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  book.author ?? 'Autor desconhecido',
+                  book.author ?? 'Autor não registrado',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
