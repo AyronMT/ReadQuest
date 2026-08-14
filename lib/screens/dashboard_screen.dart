@@ -363,6 +363,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTodaySection(BuildContext context) {
     final theme = Theme.of(context);
     final hasReadToday = _todayTotals.pages > 0;
+    final hours = _todayTotals.minutes / 60;
+    final hoursLabel = hours >= 1
+        ? '${hours.toStringAsFixed(1)} horas'
+        : '${_todayTotals.minutes} minutos';
 
     return TutorialHighlight(
       stepId: 'today_summary',
@@ -379,7 +383,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: hasReadToday
                   ? Text(
-                      'Hoje você já leu ${_todayTotals.pages} páginas em ${{_todayTotals.minutes}/60} horas.',
+                      'Hoje você já leu ${_todayTotals.pages} páginas em $hoursLabel.',
                       style: theme.textTheme.bodyMedium,
                     )
                   : Text(
