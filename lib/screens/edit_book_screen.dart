@@ -318,7 +318,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<BookStatus>(
-                value: _selectedStatus,
+                initialValue: _selectedStatus,
                 decoration: const InputDecoration(
                   labelText: 'Status *',
                   prefixIcon: Icon(Icons.info_outline),

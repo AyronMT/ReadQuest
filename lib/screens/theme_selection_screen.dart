@@ -60,7 +60,7 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
               Expanded(
                 child: ListView.separated(
                   itemCount: AppThemePreset.values.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final preset = AppThemePreset.values[index];
                     return _ThemePresetCard(

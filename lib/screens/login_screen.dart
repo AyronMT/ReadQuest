@@ -255,7 +255,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         // nativa do Google Sign-In (ver pubspec_dependencies.md).
                         onPressed: _handleGoogleLogin,
                         icon: const Icon(Icons.lock_outline, size: 20),
-                        label: const Text('Continuar com Google (em breve)'),
+                        label: const Text('Entrar com o Google'),
                       ),
                       const SizedBox(height: 12),
 
