@@ -32,23 +32,39 @@ class BookGridCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: book.coverPath != null
-                    ? Image.file(
-                        File(book.coverPath!),
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        width: double.infinity,
-                        color: theme.colorScheme.primaryContainer,
-                        child: Icon(
-                          Icons.menu_book_rounded,
-                          color: theme.colorScheme.onPrimaryContainer,
-                          size: large ? 40 : 32,
-                        ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: book.coverPath != null
+                        ? Image.file(
+                            File(book.coverPath!),
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            width: double.infinity,
+                            color: theme.colorScheme.primaryContainer,
+                            child: Icon(
+                              Icons.menu_book_rounded,
+                              color: theme.colorScheme.onPrimaryContainer,
+                              size: large ? 40 : 32,
+                            ),
+                          ),
+                  ),
+                  if (book.isActive)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber.shade700,
+                        size: large ? 22 : 18,
+                        shadows: const [Shadow(blurRadius: 4, color: Colors.black45)],
                       ),
+                    ),
+                ],
               ),
             ),
             SizedBox(height: large ? 10 : 6),
@@ -116,25 +132,40 @@ class BookListTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: book.coverPath != null
-                  ? Image.file(
-                      File(book.coverPath!),
-                      width: coverSize,
-                      height: coverSize * 1.35,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      width: coverSize,
-                      height: coverSize * 1.35,
-                      color: theme.colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.menu_book_rounded,
-                        color: theme.colorScheme.onPrimaryContainer,
-                        size: large ? 30 : 22,
-                      ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: book.coverPath != null
+                      ? Image.file(
+                          File(book.coverPath!),
+                          width: coverSize,
+                          height: coverSize * 1.35,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          width: coverSize,
+                          height: coverSize * 1.35,
+                          color: theme.colorScheme.primaryContainer,
+                          child: Icon(
+                            Icons.menu_book_rounded,
+                            color: theme.colorScheme.onPrimaryContainer,
+                            size: large ? 30 : 22,
+                          ),
+                        ),
+                ),
+                if (book.isActive)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Icon(
+                      Icons.star_rounded,
+                      color: Colors.amber.shade700,
+                      size: large ? 20 : 16,
+                      shadows: const [Shadow(blurRadius: 4, color: Colors.black45)],
                     ),
+                  ),
+              ],
             ),
             SizedBox(width: large ? 18 : 14),
             Expanded(

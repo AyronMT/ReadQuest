@@ -65,22 +65,6 @@ lib/
       └── manual_reading_entry_screen.dart
 ```
 
-## Login com Google — BLOQUEADO por enquanto
-
-A pedido, o botão "Continuar com Google" está desabilitado
-(`onPressed: null`) tanto no cadastro quanto no login, com um ícone
-de cadeado e o texto "(em breve)". Toda a lógica em
-`UserRepository.continueWithGoogle()` continua pronta e funcional —
-é só reconectar o `onPressed` quando quiser reativar. Quando for
-reativar, ainda será necessário configurar o Firebase/Google Cloud
-(SHA-1, `google-services.json`, etc.) — guia oficial:
-https://pub.dev/packages/google_sign_in
-
-## Cadastro/login por e-mail e senha
-
-Fica tudo na tabela `users` do SQLite. A senha nunca é salva em
-texto puro: `SHA-256(salt + senha)`, com salt aleatório por usuário.
-
 ## O Dashboard e o tutorial guiado
 
 - **Primeiro acesso**: ao entrar no Dashboard pela primeira vez
@@ -181,6 +165,63 @@ motivacional.
     de Perfil, que você já indicou que é future work.
 - **Recompensas pessoais**: título, custo em pontos e um emoji à
   escolha — sem efeito no app, só o registro do resgate.
+
+## Ajustes na Biblioteca
+
+- **Editar**: ícone de lápis na tela de detalhes do livro, reabre o
+  mesmo formulário do cadastro já preenchido (`AddBookScreen(editingBook: ...)`).
+- **Apagar**: ícone de lixeira na tela de detalhes, com confirmação;
+  remove o livro e todo o seu histórico de sessões.
+- **Ativos (limite de 10)**: switch "Livro ativo" na tela de
+  detalhes. `BookRepository.setActive()` recusa ativar um 11º livro
+  e a tela mostra um aviso. Um selo ⭐ aparece nos cards da
+  Biblioteca para livros ativos.
+- **Capas no Dashboard**: os cards de "Lendo agora" agora mostram a
+  imagem real da capa (`Image.file`) quando cadastrada.
+- **Restrição no registro de leitura**: o seletor de livro do botão
+  **+** agora só lista `BookRepository.getEligibleBooksForReading()`
+  — os livros marcados como ativos + os últimos 3 efetivamente lidos
+  (por sessão mais recente), em vez da biblioteca inteira.
+- **Livros de demonstração removidos**: tirei a semeadura de "Duna"
+  e "O Hobbit" do `BookRepository`. Isso vale para instalações
+  novas — se você já tem esses dois no seu ambiente de teste atual,
+  apague-os manualmente pela tela de detalhes (ou limpe os dados do
+  app) já que não existe uma migração automática para removê-los
+  retroativamente.
+
+## Banco de dados: local ou nuvem?
+
+Hoje é **100% local em SQLite**, independentemente de como o usuário
+entrou (e-mail/senha, Google ou "continuar localmente"). Login apenas
+grava uma flag de sessão — não há backend, não há sincronização, e
+dois métodos de login no mesmo aparelho enxergariam os mesmos dados.
+Construir nuvem de verdade é um projeto à parte (precisa de backend
++ camada de sync) e ainda não foi feito.
+
+## Relatórios
+
+- **Dois escopos**: "Geral" (chip fixo) e um chip por saga cadastrada
+  (`ReportsRepository.getAllSeries()`), trocando a visão inteira da tela.
+- **Geral** reúne, nessa ordem:
+  1. **Wrapped mensal** — navegação por mês (‹ Agosto 2026 ›),
+     páginas/minutos/sessões/livros concluídos no período, gênero
+     mais lido no mês e variação percentual vs. o mês anterior.
+  2. **Hábito e consistência** — ofensiva atual, recorde histórico de
+     ofensiva, e um mini-calendário com os dias do mês que tiveram
+     leitura.
+  3. **Métricas clássicas** — páginas e tempo totais, livros
+     concluídos, ritmo médio (pág/min), duração média de sessão,
+     média de páginas por dia ativo.
+  4. **Raio-X do leitor** — autor favorito, distribuição por gênero
+     (barras), distribuição de emoções registradas nas leituras, e
+     horário do dia em que mais lê (manhã/tarde/noite/madrugada).
+  5. **Economia e gamificação** — saldo, total ganho, total gasto,
+     recompensas resgatadas, congelamentos de ofensiva disponíveis.
+- **Por saga**: título, progresso agregado (livros concluídos/total),
+  páginas e tempo lidos somando todos os livros da saga, distribuição
+  de emoções e a lista de livros com progresso individual.
+- Toda a agregação vem do `ReportsRepository`, direto do SQLite —
+  nada é pré-calculado ou fica desatualizado.
 
 ## Tema (fontes via google_fonts)
 

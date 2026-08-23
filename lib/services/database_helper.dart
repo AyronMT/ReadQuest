@@ -53,6 +53,7 @@ class DatabaseHelper {
             series TEXT,
             genre TEXT,
             publisher TEXT,
+            is_active INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT NOT NULL
           )
         ''');

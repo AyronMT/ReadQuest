@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/book.dart';
 import '../models/reading_session.dart';
+import '../services/book_repository.dart';
 import '../services/reading_session_repository.dart';
+import 'add_book_screen.dart';
 
 /// Tela de detalhes de um livro: capa e metadados completos, gráfico
 /// de páginas lidas por sessão e o histórico de todas as sessões
@@ -18,38 +20,121 @@ class BookDetailScreen extends StatefulWidget {
 }
 
 class _BookDetailScreenState extends State<BookDetailScreen> {
+  final _bookRepository = BookRepository.instance;
+
+  late Book _book;
   List<ReadingSession> _sessions = [];
   bool _isLoading = true;
+  bool _isUpdatingActive = false;
 
   @override
   void initState() {
     super.initState();
+    _book = widget.book;
     _loadSessions();
   }
 
   Future<void> _loadSessions() async {
     final sessions = await ReadingSessionRepository.instance
-        .getSessionsForBook(widget.book.id!);
+        .getSessionsForBook(_book.id!);
+    final refreshedBook = await _bookRepository.getById(_book.id!);
     if (!mounted) return;
     setState(() {
       _sessions = sessions;
+      if (refreshedBook != null) _book = refreshedBook;
       _isLoading = false;
     });
+  }
+
+  Future<void> _handleEdit() async {
+    final edited = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => AddBookScreen(editingBook: _book)),
+    );
+    if (edited == true) _loadSessions();
+  }
+
+  Future<void> _handleDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Apagar livro'),
+        content: Text(
+          'Apagar "${_book.title}" e todo o seu histórico de leitura? Essa ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Apagar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await _bookRepository.deleteBook(_book.id!);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _handleToggleActive(bool value) async {
+    setState(() => _isUpdatingActive = true);
+
+    final result = await _bookRepository.setActive(_book.id!, value);
+
+    if (!mounted) return;
+    setState(() => _isUpdatingActive = false);
+
+    if (result == SetActiveResult.limitReached) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Limite de ${BookRepository.maxActiveBooks} livros ativos atingido. Desative outro antes de ativar este.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _book = _book.copyWith(isActive: value));
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final book = widget.book;
+    final book = _book;
 
     return Scaffold(
-      appBar: AppBar(title: Text(book.title)),
+      appBar: AppBar(
+        title: Text(book.title),
+        actions: [
+          IconButton(
+            onPressed: _handleEdit,
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Editar',
+          ),
+          IconButton(
+            onPressed: _handleDelete,
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Apagar',
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
                 _buildHeader(context, book, theme),
+                const SizedBox(height: 16),
+                _buildActiveToggle(context, theme),
                 const SizedBox(height: 24),
                 _buildMetadata(context, book, theme),
                 const SizedBox(height: 28),
@@ -84,6 +169,56 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                   ),
               ],
             ),
+    );
+  }
+
+  Widget _buildActiveToggle(BuildContext context, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.star_rounded,
+            color: _book.isActive
+                ? Colors.amber.shade700
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Livro ativo',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Fica sempre disponível para registrar leitura (máx. ${BookRepository.maxActiveBooks})',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _isUpdatingActive
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Switch(
+                  value: _book.isActive,
+                  onChanged: _handleToggleActive,
+                ),
+        ],
+      ),
     );
   }
 
@@ -204,70 +339,108 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   }
 
   Widget _buildChart(BuildContext context, ThemeData theme) {
-    // Mostra as últimas 10 sessões, da mais antiga para a mais
-    // recente, com a quantidade de páginas lidas em cada uma.
-    final recentSessions = _sessions.take(10).toList().reversed.toList();
+  final Map<DateTime, int> dailyPagesMap = {};
+  for (var session in _sessions) {
+    final dateOnly = DateTime(
+      session.createdAt.year, 
+      session.createdAt.month, 
+      session.createdAt.day
+    );
+    
+    dailyPagesMap[dateOnly] = (dailyPagesMap[dateOnly] ?? 0) + session.pagesRead;
+  }
 
-    final maxPages = recentSessions
-        .map((s) => s.pagesRead)
-        .fold<int>(0, (a, b) => a > b ? a : b);
+  final aggregatedSessions = dailyPagesMap.entries.toList()
+    ..sort((a, b) => b.key.compareTo(a.key));
 
-    return SizedBox(
-      height: 180,
-      child: BarChart(
-        BarChartData(
-          maxY: (maxPages * 1.2).clamp(10, double.infinity),
-          barTouchData: BarTouchData(enabled: true),
-          titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: true, reservedSize: 32),
-            ),
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final index = value.toInt();
-                  if (index < 0 || index >= recentSessions.length) {
-                    return const SizedBox.shrink();
-                  }
-                  final date = recentSessions[index].createdAt;
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      '${date.day}/${date.month}',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  );
-                },
-              ),
+  final recentSessions = aggregatedSessions.take(10).toList().reversed.toList();
+
+  final maxPages = recentSessions.isEmpty 
+      ? 0 
+      : recentSessions.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+      
+  double getInterval(int max) {
+    if (max <= 20) return 5;
+    if (max <= 50) return 10;
+    if (max <= 100) return 20;
+    if (max <= 500) return 100;
+    return 200;
+  }
+
+  return SizedBox(
+    height: 180,
+    child: BarChart(
+      BarChartData(
+        maxY: (maxPages * 1.2).clamp(10, double.infinity).toDouble(),
+        barTouchData: BarTouchData(enabled: true),
+        titlesData: FlTitlesData(
+          // EIXO Y (Esquerda)
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 44, // AUMENTADO de 32 para 44 para não quebrar a linha (100)
+              interval: getInterval(maxPages), // Força intervalos inteiros (ex: 50, 100)
+              getTitlesWidget: (value, meta) {
+                // Remove decimais estranhos forçando a ser int
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Text(
+                    value.toInt().toString(),
+                    style: theme.textTheme.bodySmall,
+                    textAlign: TextAlign.right,
+                  ),
+                );
+              },
             ),
           ),
-          borderData: FlBorderData(show: false),
-          gridData: const FlGridData(show: false),
-          barGroups: [
-            for (var i = 0; i < recentSessions.length; i++)
-              BarChartGroupData(
-                x: i,
-                barRods: [
-                  BarChartRodData(
-                    toY: recentSessions[i].pagesRead.toDouble(),
-                    color: theme.colorScheme.primary,
-                    width: 16,
-                    borderRadius: BorderRadius.circular(4),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          // EIXO X (Inferior - Datas)
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index < 0 || index >= recentSessions.length) {
+                  return const SizedBox.shrink();
+                }
+                // Agora recentSessions contém MapEntries (key = data, value = páginas)
+                final date = recentSessions[index].key; 
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    '${date.day}/${date.month}',
+                    style: theme.textTheme.bodySmall,
                   ),
-                ],
-              ),
-          ],
+                );
+              },
+            ),
+          ),
         ),
+        borderData: FlBorderData(show: false),
+        gridData: const FlGridData(show: false),
+        barGroups: [
+          for (var i = 0; i < recentSessions.length; i++)
+            BarChartGroupData(
+              x: i,
+              barRods: [
+                BarChartRodData(
+                  toY: recentSessions[i].value.toDouble(), // Usa o valor agregado
+                  color: theme.colorScheme.primary,
+                  width: 16,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ],
+            ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+} 
 }
 
 class _SessionHistoryTile extends StatelessWidget {
@@ -316,6 +489,15 @@ class _SessionHistoryTile extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               '"${session.feedback}"',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+          if (session.feedback == null) ...[
+            const SizedBox(height: 6),
+            Text(
+              '"Nenhum feedback."',
               style: theme.textTheme.bodySmall?.copyWith(
                 fontStyle: FontStyle.italic,
               ),

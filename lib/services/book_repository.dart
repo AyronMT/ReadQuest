@@ -1,4 +1,3 @@
-import 'package:sqflite/sqflite.dart';
 import '../models/book.dart';
 import 'database_helper.dart';
 
@@ -31,19 +30,22 @@ enum BookSortOption {
   }
 }
 
+/// Resultado de uma tentativa de ativar um livro.
+enum SetActiveResult { success, limitReached }
+
 class BookRepository {
   BookRepository._internal();
   static final BookRepository instance = BookRepository._internal();
+
+  static const int maxActiveBooks = 10;
 
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
 
   /// Retorna os livros não encerrados (status 'reading'), do mais
   /// recentemente atualizado para o mais antigo. Usado no Dashboard
-  /// (limitado a 3) e no seletor de livro do registro de leitura
-  /// (sem limite).
+  /// (limitado a 3).
   Future<List<Book>> getUnfinishedBooks({int? limit}) async {
     final db = await _dbHelper.database;
-    await _seedSampleBooksIfEmpty(db);
 
     final rows = await db.query(
       'books',
@@ -56,6 +58,47 @@ class BookRepository {
     return rows.map(Book.fromMap).toList();
   }
 
+  /// Livros elegíveis para registro de leitura: os que estão
+  /// marcados como ativos + os últimos 3 livros efetivamente lidos
+  /// (por sessão mais recente). Evita que o seletor fique poluído
+  /// com toda a biblioteca conforme ela cresce.
+  Future<List<Book>> getEligibleBooksForReading() async {
+    final db = await _dbHelper.database;
+
+    final activeRows = await db.query(
+      'books',
+      columns: ['id'],
+      where: 'is_active = 1 AND status = ?',
+      whereArgs: [BookStatus.reading.name],
+    );
+    final activeIds = activeRows.map((r) => r['id'] as int).toSet();
+
+    final recentRows = await db.rawQuery('''
+      SELECT book_id, MAX(created_at) as last_read
+      FROM reading_sessions
+      GROUP BY book_id
+      ORDER BY last_read DESC
+      LIMIT 3
+    ''');
+    final recentIds = recentRows.map((r) => r['book_id'] as int).toSet();
+
+    final allIds = {...activeIds, ...recentIds};
+    if (allIds.isEmpty) {
+      // Nenhum livro ativo nem lido ainda: cai de volta para os
+      // livros em andamento mais recentes, pra não travar o usuário.
+      return getUnfinishedBooks(limit: 3);
+    }
+
+    final placeholders = List.filled(allIds.length, '?').join(',');
+    final rows = await db.query(
+      'books',
+      where: 'id IN ($placeholders) AND status = ?',
+      whereArgs: [...allIds, BookStatus.reading.name],
+      orderBy: 'updated_at DESC',
+    );
+    return rows.map(Book.fromMap).toList();
+  }
+
   /// Busca livros para a tela de Biblioteca, com filtros opcionais de
   /// status, gênero e texto de busca (título ou autor), e ordenação.
   Future<List<Book>> getFilteredBooks({
@@ -65,7 +108,6 @@ class BookRepository {
     BookSortOption sortBy = BookSortOption.recentlyUpdated,
   }) async {
     final db = await _dbHelper.database;
-    await _seedSampleBooksIfEmpty(db);
 
     final conditions = <String>[];
     final args = <Object?>[];
@@ -108,6 +150,52 @@ class BookRepository {
     return db.insert('books', book.toMap()..remove('id'));
   }
 
+  /// Atualiza todos os campos editáveis de um livro já cadastrado.
+  Future<void> updateBook(Book book) async {
+    final db = await _dbHelper.database;
+    await db.update(
+      'books',
+      book.toMap()
+        ..remove('id')
+        ..['updated_at'] = DateTime.now().toIso8601String(),
+      where: 'id = ?',
+      whereArgs: [book.id],
+    );
+  }
+
+  /// Apaga um livro e todo o seu histórico de sessões de leitura.
+  Future<void> deleteBook(int bookId) async {
+    final db = await _dbHelper.database;
+    await db.delete('reading_sessions', where: 'book_id = ?', whereArgs: [bookId]);
+    await db.delete('books', where: 'id = ?', whereArgs: [bookId]);
+  }
+
+  Future<int> getActiveCount() async {
+    final db = await _dbHelper.database;
+    final rows = await db.query('books', where: 'is_active = 1');
+    return rows.length;
+  }
+
+  /// Marca/desmarca um livro como ativo. Respeita o limite de
+  /// [maxActiveBooks] ativos simultaneamente.
+  Future<SetActiveResult> setActive(int bookId, bool active) async {
+    if (active) {
+      final currentCount = await getActiveCount();
+      if (currentCount >= maxActiveBooks) {
+        return SetActiveResult.limitReached;
+      }
+    }
+
+    final db = await _dbHelper.database;
+    await db.update(
+      'books',
+      {'is_active': active ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [bookId],
+    );
+    return SetActiveResult.success;
+  }
+
   /// Atualiza a página atual de um livro após um registro de leitura.
   /// Marca automaticamente como concluído se atingir o total de páginas.
   Future<void> updateProgress(int bookId, int newCurrentPage) async {
@@ -131,39 +219,7 @@ class BookRepository {
     );
   }
 
-  /// Atualiza todos os dados de um livro existente.
-  Future<void> updateBook(Book book) async {
-    final db = await _dbHelper.database;
-    if (book.id == null) return;
-
-    await db.update(
-      'books',
-      book.toMap()..remove('id'),
-      where: 'id = ?',
-      whereArgs: [book.id],
-    );
-  }
-
-  /// Deleta um livro e todos os seus registros de leitura.
-  Future<void> deleteBook(int bookId) async {
-    final db = await _dbHelper.database;
-    
-    // Deleta registros de leitura do livro
-    await db.delete(
-      'reading_sessions',
-      where: 'book_id = ?',
-      whereArgs: [bookId],
-    );
-    
-    // Deleta o livro
-    await db.delete(
-      'books',
-      where: 'id = ?',
-      whereArgs: [bookId],
-    );
-  }
-
-  /// Retorna os gêneros distintos já cadastrados (para os filtros da
+  /// Retorna os valores distintos já cadastrados (para os filtros da
   /// Biblioteca e para sugestões de autopreenchimento).
   Future<List<String>> getDistinctGenres() => _getDistinctValues('genre');
   Future<List<String>> getDistinctAuthors() => _getDistinctValues('author');
@@ -177,40 +233,5 @@ class BookRepository {
       'SELECT DISTINCT $column FROM books WHERE $column IS NOT NULL AND $column != "" ORDER BY $column COLLATE NOCASE ASC',
     );
     return rows.map((r) => r[column] as String).toList();
-  }
-
-  /// Popula dois livros de exemplo na primeira execução, para que o
-  /// Dashboard e o registro de leitura já tenham o que mostrar antes
-  /// do usuário cadastrar seus próprios livros.
-  Future<void> _seedSampleBooksIfEmpty(Database db) async {
-    final count = Sqflite.firstIntValue(
-          await db.rawQuery('SELECT COUNT(*) FROM books'),
-        ) ??
-        0;
-    if (count > 0) return;
-
-    final now = DateTime.now().toIso8601String();
-    await db.insert('books', {
-      'title': 'Duna',
-      'author': 'Frank Herbert',
-      'total_pages': 688,
-      'current_page': 120,
-      'status': BookStatus.reading.name,
-      'genre': 'Ficção científica',
-      'series': 'Crônicas de Duna',
-      'publisher': 'Aleph',
-      'updated_at': now,
-    });
-    await db.insert('books', {
-      'title': 'O Hobbit',
-      'author': 'J.R.R. Tolkien',
-      'total_pages': 310,
-      'current_page': 40,
-      'status': BookStatus.reading.name,
-      'genre': 'Fantasia',
-      'series': 'O Senhor dos Anéis',
-      'publisher': 'HarperCollins',
-      'updated_at': now,
-    });
   }
 }

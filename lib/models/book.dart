@@ -38,6 +38,7 @@ class Book {
   final String? series; // "saga"
   final String? genre;
   final String? publisher;
+  final bool isActive;
   final DateTime updatedAt;
 
   const Book({
@@ -52,6 +53,7 @@ class Book {
     this.series,
     this.genre,
     this.publisher,
+    this.isActive = false,
     required this.updatedAt,
   });
 
@@ -73,6 +75,7 @@ class Book {
     String? series,
     String? genre,
     String? publisher,
+    bool? isActive,
     DateTime? updatedAt,
   }) {
     return Book(
@@ -87,6 +90,7 @@ class Book {
       series: series ?? this.series,
       genre: genre ?? this.genre,
       publisher: publisher ?? this.publisher,
+      isActive: isActive ?? this.isActive,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -104,6 +108,7 @@ class Book {
       'series': series,
       'genre': genre,
       'publisher': publisher,
+      'is_active': isActive ? 1 : 0,
       'updated_at': updatedAt.toIso8601String(),
     };
   }
@@ -121,6 +126,7 @@ class Book {
       series: map['series'] as String?,
       genre: map['genre'] as String?,
       publisher: map['publisher'] as String?,
+      isActive: (map['is_active'] as int? ?? 0) == 1,
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
   }

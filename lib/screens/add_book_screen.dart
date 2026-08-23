@@ -4,11 +4,14 @@ import 'package:image_picker/image_picker.dart';
 import '../models/book.dart';
 import '../services/book_repository.dart';
 
-/// Tela de cadastro de um novo livro. Apenas título e total de
-/// páginas são obrigatórios. Autor, gênero, saga e editora sugerem
-/// autopreenchimento com base em livros já cadastrados anteriormente.
+/// Tela de cadastro (ou edição, se [editingBook] for informado) de um
+/// livro. Apenas título e total de páginas são obrigatórios. Autor,
+/// gênero, saga e editora sugerem autopreenchimento com base em
+/// livros já cadastrados anteriormente.
 class AddBookScreen extends StatefulWidget {
-  const AddBookScreen({super.key});
+  final Book? editingBook;
+
+  const AddBookScreen({super.key, this.editingBook});
 
   @override
   State<AddBookScreen> createState() => _AddBookScreenState();
@@ -38,6 +41,18 @@ class _AddBookScreenState extends State<AddBookScreen> {
   void initState() {
     super.initState();
     _loadSuggestions();
+
+    final book = widget.editingBook;
+    if (book != null) {
+      _titleController.text = book.title;
+      _pagesController.text = book.totalPages.toString();
+      _authorController.text = book.author ?? '';
+      _genreController.text = book.genre ?? '';
+      _seriesController.text = book.series ?? '';
+      _publisherController.text = book.publisher ?? '';
+      _isbnController.text = book.isbn ?? '';
+      _coverPath = book.coverPath;
+    }
   }
 
   Future<void> _loadSuggestions() async {
@@ -97,9 +112,15 @@ class _AddBookScreenState extends State<AddBookScreen> {
 
     setState(() => _isSaving = true);
 
+    final isEditing = widget.editingBook != null;
+
     final book = Book(
+      id: widget.editingBook?.id,
       title: _titleController.text.trim(),
       totalPages: int.parse(_pagesController.text.trim()),
+      currentPage: widget.editingBook?.currentPage ?? 0,
+      status: widget.editingBook?.status ?? BookStatus.reading,
+      isActive: widget.editingBook?.isActive ?? false,
       author: _authorController.text.trim().isEmpty
           ? null
           : _authorController.text.trim(),
@@ -119,7 +140,11 @@ class _AddBookScreenState extends State<AddBookScreen> {
       updatedAt: DateTime.now(),
     );
 
-    await _bookRepository.addBook(book);
+    if (isEditing) {
+      await _bookRepository.updateBook(book);
+    } else {
+      await _bookRepository.addBook(book);
+    }
 
     if (!mounted) return;
     setState(() => _isSaving = false);
@@ -164,7 +189,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Novo livro')),
+      appBar: AppBar(title: Text(widget.editingBook != null ? 'Editar livro' : 'Novo livro')),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -292,7 +317,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('Adicionar à biblioteca'),
+                    : Text(widget.editingBook != null ? 'Salvar alterações' : 'Adicionar à biblioteca'),
               ),
             ],
           ),

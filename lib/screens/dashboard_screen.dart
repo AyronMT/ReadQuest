@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:monitorador_de_leitura/screens/book_detail_screen.dart';
 import '../models/book.dart';
 import '../models/reading_session.dart';
 import '../services/book_repository.dart';
@@ -31,6 +33,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final BookRepository _bookRepository = BookRepository.instance;
   final ReadingSessionRepository _sessionRepository =
       ReadingSessionRepository.instance;
+
+  void _openBookDetail(Book book) {
+    // O Navigator.push empilha uma nova tela por cima da atual
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        // Aqui você diz para qual tela ir, passando as informações do livro clicado
+        builder: (context) => BookDetailScreen(book: book),
+      ),
+    );
+  }
 
   List<Book> _currentBooks = [];
   int _streak = 0;
@@ -112,14 +125,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    final allUnfinished = await _bookRepository.getUnfinishedBooks();
+    final eligibleBooks = await _bookRepository.getEligibleBooksForReading();
     if (!mounted) return;
 
     final selectedBook = await showModalBottomSheet<Book>(
       context: context,
       isScrollControlled: true,
       builder: (_) => BookPickerSheet(
-        books: allUnfinished,
+        books: eligibleBooks,
         preselected: _currentBooks.first,
       ),
     );
@@ -135,7 +148,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (mode == ReadingMode.timer) {
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ReadingTimerScreen(book: selectedBook)),
+        MaterialPageRoute(
+          builder: (_) => ReadingTimerScreen(book: selectedBook),
+        ),
       );
     } else {
       await Navigator.of(context).push(
@@ -153,7 +168,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return ListenableBuilder(
       listenable: TutorialController.instance,
       builder: (context, _) {
-        final showTutorial = TutorialController.instance.isActive &&
+        final showTutorial =
+            TutorialController.instance.isActive &&
             TutorialController.instance.currentScreen == 'dashboard';
 
         return Stack(
@@ -183,7 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 stepId: 'nav_add',
                 child: FloatingActionButton(
                   onPressed: _openAddReadingFlow,
-                  child: const Icon(Icons.add),
+                  child: const Text("Registrar Leitura"),
                 ),
               ),
               floatingActionButtonLocation:
@@ -297,7 +313,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ..._currentBooks.map(
               (book) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _BookProgressCard(book: book),
+                child: GestureDetector(
+  
+                  onTap: () => _openBookDetail(
+                    book,
+                  ),
+                  child: _BookProgressCard(book: book),
+                ),
               ),
             ),
         ],
@@ -309,7 +331,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final theme = Theme.of(context);
     final hasGoldAccent = _ownedDecorations.contains('accent_gold');
     final hasStarsDecoration = _ownedDecorations.contains('deco_stars');
-    final flameColor = hasGoldAccent ? Colors.amber.shade700 : Colors.deepOrange;
+    final flameColor = hasGoldAccent
+        ? Colors.amber.shade700
+        : Colors.deepOrange;
 
     return TutorialHighlight(
       stepId: 'streak',
@@ -363,10 +387,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTodaySection(BuildContext context) {
     final theme = Theme.of(context);
     final hasReadToday = _todayTotals.pages > 0;
-    final hours = _todayTotals.minutes / 60;
-    final hoursLabel = hours >= 1
-        ? '${hours.toStringAsFixed(1)} horas'
-        : '${_todayTotals.minutes} minutos';
 
     return TutorialHighlight(
       stepId: 'today_summary',
@@ -383,7 +403,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: hasReadToday
                   ? Text(
-                      'Hoje você já leu ${_todayTotals.pages} páginas em $hoursLabel.',
+                      'Hoje você já leu ${_todayTotals.pages} páginas em ${_todayTotals.minutes} min.',
                       style: theme.textTheme.bodyMedium,
                     )
                   : Text(
@@ -416,9 +436,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           TutorialHighlight(
             stepId: 'nav_library',
             child: IconButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LibraryScreen()),
-              ),
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const LibraryScreen())),
               icon: const Icon(Icons.menu_book_rounded),
             ),
           ),
@@ -426,18 +446,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           TutorialHighlight(
             stepId: 'nav_reports',
             child: IconButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ReportsScreen()),
-              ),
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const ReportsScreen())),
               icon: const Icon(Icons.bar_chart_rounded),
             ),
           ),
           TutorialHighlight(
             stepId: 'nav_store',
             child: IconButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const StoreScreen()),
-              ),
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const StoreScreen())),
               icon: const Icon(Icons.storefront_rounded),
             ),
           ),
@@ -468,14 +488,17 @@ class _BookProgressCard extends StatelessWidget {
           Container(
             width: 44,
             height: 60,
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: theme.colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              Icons.menu_book_rounded,
-              color: theme.colorScheme.onPrimaryContainer,
-            ),
+            child: book.coverPath != null
+                ? Image.file(File(book.coverPath!), fit: BoxFit.cover)
+                : Icon(
+                    Icons.menu_book_rounded,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -491,7 +514,7 @@ class _BookProgressCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  book.author ?? 'Autor não registrado',
+                  book.author ?? 'Autor desconhecido',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

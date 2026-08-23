@@ -231,7 +231,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   OutlinedButton.icon(
                     onPressed: _handleGoogleSignUp,
                     icon: const Icon(Icons.lock_outline, size: 20),
-                    label: const Text('Cadastrar-se com o Google'),
+                    label: const Text('Continuar com Google'),
                   ),
                 ],
               ),
