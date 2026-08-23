@@ -1,3 +1,6 @@
+import com.android.build.gradle.internal.api.BaseVariantOutputImpl
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -11,13 +14,24 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    applicationVariants.configureEach {
+        val variantName = name
+        outputs.configureEach {
+            // Pegamos a versão configurada no pubspec.yaml
+            val versionName = defaultConfig.versionName
+            
+            // Defina o nome base do seu arquivo APK
+            val appName = "ReadQuest" 
+            
+            // Define o novo nome do arquivo. 
+            // Exemplo de saída: MeuApp_v1.0.5_release.apk
+            (this as BaseVariantOutputImpl).outputFileName = "${appName}_v${versionName}_${variantName}.apk"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -37,6 +51,12 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
