@@ -35,11 +35,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ReadingSessionRepository.instance;
 
   void _openBookDetail(Book book) {
-    // O Navigator.push empilha uma nova tela por cima da atual
     Navigator.push(
       context,
       MaterialPageRoute(
-        // Aqui você diz para qual tela ir, passando as informações do livro clicado
         builder: (context) => BookDetailScreen(book: book),
       ),
     );
@@ -199,7 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 stepId: 'nav_add',
                 child: FloatingActionButton(
                   onPressed: _openAddReadingFlow,
-                  child: const Text("Registrar Leitura"),
+                  child: const Icon(IconData(0xe4df, fontFamily: 'MaterialIcons')),
                 ),
               ),
               floatingActionButtonLocation:

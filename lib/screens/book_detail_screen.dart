@@ -497,7 +497,7 @@ class _SessionHistoryTile extends StatelessWidget {
           if (session.feedback == null) ...[
             const SizedBox(height: 6),
             Text(
-              '"Nenhum feedback."',
+              'Nenhum feedback.',
               style: theme.textTheme.bodySmall?.copyWith(
                 fontStyle: FontStyle.italic,
               ),
