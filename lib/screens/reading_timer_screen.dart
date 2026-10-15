@@ -144,7 +144,8 @@ class _ReadingTimerScreenState extends State<ReadingTimerScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.book.title)),
       body: SafeArea(
-        child: Padding(
+        child: Center (
+          child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -189,6 +190,7 @@ class _ReadingTimerScreenState extends State<ReadingTimerScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
